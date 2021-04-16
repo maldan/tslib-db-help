@@ -20,6 +20,7 @@ jobs:
       - run: npm run test
       - run: wget https://raw.githubusercontent.com/maldan/npm-semver/main/semver.js
       - run: node ./semver.js
+      - run: git push
       - run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_AUTH_TOKEN}}
