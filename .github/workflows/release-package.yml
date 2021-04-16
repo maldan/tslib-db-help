@@ -15,6 +15,7 @@ jobs:
           node-version: 12
           registry-url: https://registry.npmjs.org/
       - run: npm install
+      - run: npm run test
       - run: wget https://raw.githubusercontent.com/maldan/npm-semver/main/semver.js
       - run: node ./semver.js
       - run: npm publish --access public
