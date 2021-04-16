@@ -1,6 +1,6 @@
 {
   "name": "@maldan/tslib-db-help",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "SQL Lite helper",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
