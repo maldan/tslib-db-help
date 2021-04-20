@@ -29,20 +29,16 @@ interface IBase {
     },
   );*/
 
-  interface ITest extends Record<string, unknown> {
-    id: number;
-    idd: number;
-  }
-
   await db.createIfNotExists('sas', {
     name: 'TEXT',
     fuck: 'INTEGER',
   });
 
-  const x = await db.table.sas.push({
+  /*const x = await db.table.sas.push({
     name: 'GAS',
-  });
+  });*/
   await db.table.sas.push({ id: 2 });
+  await db.table.sas.findOne({ '>= name': 2 });
 
-  console.log(x);
+  // console.log(x);
 })();

@@ -42,10 +42,19 @@ class Table {
         this.db = db;
         this.name = name;
     }
+    findOneOrThrowError(where) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const r = yield this.findOne(where);
+            if (!r) {
+                throw new Error(`Record not found!`);
+            }
+            return r;
+        });
+    }
     findOne(where) {
         return __awaiter(this, void 0, void 0, function* () {
             const [condition, obj] = Util_1.Util.conditionBuilder(where);
-            return (yield this.db.get(`SELECT * FROM "${this.name}" ${condition} LIMIT 1`, obj));
+            return ((yield this.db.get(`SELECT * FROM "${this.name}" ${condition} LIMIT 1`, obj)) || null);
         });
     }
     find(where) {
@@ -135,6 +144,8 @@ class DataBase {
     createIfNotExists(name, fields) {
         return __awaiter(this, void 0, void 0, function* () {
             let out = ``;
+            // @ts-ignore
+            delete fields['id'];
             for (const s in fields) {
                 out += `"${s}" ${fields[s]} `;
                 if (fields[s] === 'TEXT') {

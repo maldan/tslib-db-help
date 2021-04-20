@@ -5,51 +5,81 @@ export class Util {
       .replace('> ', 'gt_')
       .replace('<= ', 'lte_')
       .replace('>= ', 'gte_')
-      .replace('= ', 'eq_');
+      .replace('== ', 'eq_')
+      .replace('!= ', 'neq_');
   }
 
   static convertDate(date: Date): string {
     return JSON.stringify(date).replace(/"/g, '').replace('T', ' ').split('.')[0];
   }
 
-  static conditionBuilder(where: Record<string, unknown>): [string, Record<string, unknown>] {
+  static convertOp(op: string): string {
+    return op.replace('==', '=').replace('!=', '<>');
+  }
+
+  private static conditionBuilder_t(
+    where: Record<string, unknown>,
+    prefix: string = '',
+  ): [string, Record<string, unknown>] {
     let condition = '';
+
     const newObject: { [x: string]: unknown } = {};
     for (const key in where) {
       if (where[key] instanceof Date) {
-        newObject['$' + Util.convertKeyWithOperator(key)] = Util.convertDate(where[key] as Date);
+        newObject['$' + Util.convertKeyWithOperator(key) + prefix] = Util.convertDate(
+          where[key] as Date,
+        );
       } else {
-        newObject['$' + Util.convertKeyWithOperator(key)] = where[key];
+        newObject['$' + Util.convertKeyWithOperator(key) + prefix] = where[key];
       }
     }
 
-    if (Array.isArray(where)) {
-    } else {
-      // If has any key
-      if (Object.keys(where).length) {
-        condition = ' WHERE ';
+    // If has any key
+    if (Object.keys(where).length) {
+      condition = ' WHERE ';
+    }
+
+    // Build condition
+    for (let key in where) {
+      let op = `=`;
+      const originalKey = key;
+      if (key.split(' ').length > 1) {
+        op = key.split(' ')[0];
+        key = key.split(' ')[1];
       }
 
-      // Build condition
-      for (let key in where) {
-        let op = `=`;
-        const originalKey = key;
-        if (key.split(' ').length > 1) {
-          op = key.split(' ')[0];
-          key = key.split(' ')[1];
-        }
+      if (where[originalKey] instanceof Date) {
+        condition += `date(\`${key}\`) ${this.convertOp(op)} date($${
+          Util.convertKeyWithOperator(originalKey) + prefix
+        }) AND `;
+      } else {
+        condition += `\`${key}\` ${this.convertOp(op)} $${
+          Util.convertKeyWithOperator(originalKey) + prefix
+        } AND `;
+      }
+    }
+    condition = condition.slice(0, -4);
+    return [condition, newObject];
+  }
 
-        if (where[originalKey] instanceof Date) {
-          condition += `date(\`${key}\`) ${op} date($${Util.convertKeyWithOperator(
-            originalKey,
-          )}) AND `;
-        } else {
-          condition += `\`${key}\` ${op} $${Util.convertKeyWithOperator(originalKey)} AND `;
-        }
+  static conditionBuilder(
+    where: Record<string, unknown> | Record<string, unknown>[],
+  ): [string, Record<string, unknown>] {
+    if (Array.isArray(where)) {
+      let condition = ``;
+      let obj = {};
+      if (where.length > 0) {
+        condition = 'WHERE ';
+      }
+      for (let i = 0; i < where.length; i++) {
+        const [a, b] = this.conditionBuilder_t(where[i], `__b${i}`);
+        obj = { ...obj, ...b };
+        condition += '(' + a.replace(/^ WHERE /, '') + ') OR ';
       }
       condition = condition.slice(0, -4);
+      return [condition, obj];
+    } else {
+      return this.conditionBuilder_t(where);
     }
-
-    return [condition, newObject];
   }
 }
