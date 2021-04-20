@@ -6,13 +6,8 @@ import { Util } from './Util';
 
 export type Type_DB_Field = 'INTEGER' | 'TEXT' | 'REAL';
 
-type Type_WhereOp<X> =
-  | `>= ${Extract<keyof X, string>}`
-  | `> ${Extract<keyof X, string>}`
-  | `<= ${Extract<keyof X, string>}`
-  | `< ${Extract<keyof X, string>}`
-  | `= ${Extract<keyof X, string>}`;
-type Type_WhereClause<X> = Partial<X> | Record<Type_WhereOp<X>, X[keyof X]>;
+type Type_WhereOp<X> = `${'>=' | '>' | '<=' | '<' | '==' | '!='} ${Extract<keyof X, string>}`;
+type Type_WhereClause<X> = Partial<X> | Partial<Record<Type_WhereOp<X>, X[keyof X]>>;
 
 export class Table<X> {
   readonly db!: Database;
@@ -23,15 +18,25 @@ export class Table<X> {
     this.name = name;
   }
 
-  async findOne(where: Type_WhereClause<X>): Promise<X> {
-    const [condition, obj] = Util.conditionBuilder(where);
-    return ((await this.db.get(
-      `SELECT * FROM "${this.name}" ${condition} LIMIT 1`,
-      obj,
-    )) as unknown) as X;
+  async findOneOrThrowError(where: Type_WhereClause<X> | Type_WhereClause<X>[]): Promise<X> {
+    const r = await this.findOne(where);
+    if (!r) {
+      throw new Error(`Record not found!`);
+    }
+    return r;
   }
 
-  async find(where: Type_WhereClause<X>): Promise<X[]> {
+  async findOne(where: Type_WhereClause<X> | Type_WhereClause<X>[]): Promise<X | null> {
+    const [condition, obj] = Util.conditionBuilder(where);
+    return (
+      (((await this.db.get(
+        `SELECT * FROM "${this.name}" ${condition} LIMIT 1`,
+        obj,
+      )) as unknown) as X) || null
+    );
+  }
+
+  async find(where: Type_WhereClause<X> | Type_WhereClause<X>[]): Promise<X[]> {
     const [condition, obj] = Util.conditionBuilder(where);
     const resultList = ((await this.db.all(
       `SELECT * FROM "${this.name}" ${condition}`,
@@ -40,7 +45,10 @@ export class Table<X> {
     return resultList;
   }
 
-  async update(data: Partial<X>, where: Type_WhereClause<X>): Promise<void> {
+  async update(
+    data: Partial<X>,
+    where: Type_WhereClause<X> | Type_WhereClause<X>[],
+  ): Promise<void> {
     const [condition, obj] = Util.conditionBuilder(where);
     let set = ``;
     const newObject: { [x: string]: unknown } = {};
@@ -58,7 +66,7 @@ export class Table<X> {
     await this.db.run(`UPDATE "${this.name}" SET ${set} ${condition}`, { ...newObject, ...obj });
   }
 
-  async delete(where: Type_WhereClause<X>): Promise<void> {
+  async delete(where: Type_WhereClause<X> | Type_WhereClause<X>[]): Promise<void> {
     const [condition, obj] = Util.conditionBuilder(where);
 
     await this.db.run(`DELETE FROM "${this.name}" ${condition}`, obj);
@@ -127,11 +135,11 @@ export class DataBase<X extends Record<keyof X, Table<unknown>>> {
     `);
   }
 
-  async createIfNotExists<T extends Record<string, unknown>>(
-    name: keyof X,
-    fields: Record<keyof T, Type_DB_Field>,
-  ): Promise<void> {
+  async createIfNotExists<T>(name: keyof X, fields: Record<keyof T, Type_DB_Field>): Promise<void> {
     let out = ``;
+
+    // @ts-ignore
+    delete fields['id'];
 
     for (const s in fields) {
       out += `"${s}" ${fields[s]} `;
