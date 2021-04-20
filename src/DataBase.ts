@@ -2,22 +2,111 @@ import * as SQL3 from 'sqlite3';
 import SHA1 from 'sha1';
 import { Database, open } from 'sqlite';
 import { DataBaseError } from './error/DataBaseError';
+import { Util } from './Util';
 
 export type Type_DB_Field = 'INTEGER' | 'TEXT' | 'REAL';
 
-export class DataBase {
+type Type_WhereOp<X> =
+  | `>= ${Extract<keyof X, string>}`
+  | `> ${Extract<keyof X, string>}`
+  | `<= ${Extract<keyof X, string>}`
+  | `< ${Extract<keyof X, string>}`
+  | `= ${Extract<keyof X, string>}`;
+type Type_WhereClause<X> = Partial<X> | Record<Type_WhereOp<X>, X[keyof X]>;
+
+export class Table<X> {
+  readonly db!: Database;
+  readonly name!: string;
+
+  constructor(db: Database, name: string) {
+    this.db = db;
+    this.name = name;
+  }
+
+  async findOne(where: Type_WhereClause<X>): Promise<X> {
+    const [condition, obj] = Util.conditionBuilder(where);
+    return ((await this.db.get(
+      `SELECT * FROM "${this.name}" ${condition} LIMIT 1`,
+      obj,
+    )) as unknown) as X;
+  }
+
+  async find(where: Type_WhereClause<X>): Promise<X[]> {
+    const [condition, obj] = Util.conditionBuilder(where);
+    const resultList = ((await this.db.all(
+      `SELECT * FROM "${this.name}" ${condition}`,
+      obj,
+    )) as unknown) as X[];
+    return resultList;
+  }
+
+  async update(data: Partial<X>, where: Type_WhereClause<X>): Promise<void> {
+    const [condition, obj] = Util.conditionBuilder(where);
+    let set = ``;
+    const newObject: { [x: string]: unknown } = {};
+
+    for (const s in data) {
+      set += s + '=$__' + s + ', ';
+      if (data[s] instanceof Date) {
+        // @ts-ignore
+        data[s] = Util.convertDate(data[s] as Date);
+      }
+      newObject['$__' + s] = data[s];
+    }
+    set = set.slice(0, -2);
+
+    await this.db.run(`UPDATE "${this.name}" SET ${set} ${condition}`, { ...newObject, ...obj });
+  }
+
+  async delete(where: Type_WhereClause<X>): Promise<void> {
+    const [condition, obj] = Util.conditionBuilder(where);
+
+    await this.db.run(`DELETE FROM "${this.name}" ${condition}`, obj);
+  }
+
+  async push(values: Partial<X>): Promise<number> {
+    const params = Object.keys(values);
+    const newObject: { [x: string]: unknown } = {};
+
+    for (const s in values) {
+      if (values[s] instanceof Date) {
+        // @ts-ignore
+        values[s] = Util.convertDate(values[s] as Date);
+      }
+      newObject['$' + s] = values[s];
+    }
+
+    try {
+      return (
+        await this.db.run(
+          `INSERT INTO "${this.name}"(${params.join(',')}) VALUES (${Object.keys(newObject).join(
+            ',',
+          )})`,
+          newObject,
+        )
+      )['lastID'] as number;
+    } catch (e) {
+      throw new DataBaseError(e);
+    }
+  }
+}
+
+export class DataBase<X extends Record<keyof X, Table<unknown>>> {
   private _db!: Database;
   readonly path: string;
+
+  table!: X;
 
   constructor(path: string) {
     this.path = path;
   }
 
-  async init(): Promise<DataBase> {
+  async init(): Promise<DataBase<X>> {
     this._db = await open({
       filename: this.path,
       driver: SQL3.Database,
     });
+    this.table = {} as X;
     await this.initSessionTable();
     return this;
   }
@@ -38,61 +127,10 @@ export class DataBase {
     `);
   }
 
-  private convertKeyWithOperator(key: string) {
-    return key
-      .replace('< ', 'lt_')
-      .replace('> ', 'gt_')
-      .replace('<= ', 'lte_')
-      .replace('>= ', 'gte_')
-      .replace('= ', 'eq_');
-  }
-
-  private convertDate(date: Date) {
-    return JSON.stringify(date).replace(/"/g, '').replace('T', ' ').split('.')[0];
-  }
-
-  private conditionBuilder(where: { [x: string]: unknown }): [string, { [x: string]: unknown }] {
-    let condition = '';
-    const newObject: { [x: string]: unknown } = {};
-    for (const key in where) {
-      if (where[key] instanceof Date) {
-        newObject['$' + this.convertKeyWithOperator(key)] = this.convertDate(where[key] as Date);
-      } else {
-        newObject['$' + this.convertKeyWithOperator(key)] = where[key];
-      }
-    }
-
-    if (Array.isArray(where)) {
-    } else {
-      // If has any key
-      if (Object.keys(where).length) {
-        condition = ' WHERE ';
-      }
-
-      // Build condition
-      for (let key in where) {
-        let op = `=`;
-        const originalKey = key;
-        if (key.split(' ').length > 1) {
-          op = key.split(' ')[0];
-          key = key.split(' ')[1];
-        }
-
-        if (where[originalKey] instanceof Date) {
-          condition += `date(\`${key}\`) ${op} date($${this.convertKeyWithOperator(
-            originalKey,
-          )}) AND `;
-        } else {
-          condition += `\`${key}\` ${op} $${this.convertKeyWithOperator(originalKey)} AND `;
-        }
-      }
-      condition = condition.slice(0, -4);
-    }
-
-    return [condition, newObject];
-  }
-
-  async createIfNotExists(name: string, fields: { [x: string]: Type_DB_Field }): Promise<void> {
+  async createIfNotExists<T extends Record<string, unknown>>(
+    name: keyof X,
+    fields: Record<keyof T, Type_DB_Field>,
+  ): Promise<void> {
     let out = ``;
 
     for (const s in fields) {
@@ -116,67 +154,9 @@ export class DataBase {
         PRIMARY KEY("id" AUTOINCREMENT)
       );
     `);
-  }
 
-  async findOne<T>(table: string, where: { [x: string]: unknown }): Promise<T> {
-    const [condition, obj] = this.conditionBuilder(where);
-    return ((await this._db.get(
-      `SELECT * FROM "${table}" ${condition} LIMIT 1`,
-      obj,
-    )) as unknown) as T;
-  }
-
-  async find<T>(table: string, where: { [x: string]: unknown }): Promise<T[]> {
-    const [condition, obj] = this.conditionBuilder(where);
-    // console.log(condition, obj);
-    return ((await this._db.all(`SELECT * FROM "${table}" ${condition}`, obj)) as unknown) as T[];
-  }
-
-  async update(
-    table: string,
-    data: { [x: string]: unknown },
-    where: { [x: string]: unknown },
-  ): Promise<void> {
-    const [condition, obj] = this.conditionBuilder(where);
-    let set = ``;
-    const newObject: { [x: string]: unknown } = {};
-
-    for (const s in data) {
-      set += s + '=$__' + s + ', ';
-      if (data[s] instanceof Date) {
-        data[s] = this.convertDate(data[s] as Date);
-      }
-      newObject['$__' + s] = data[s];
-    }
-    set = set.slice(0, -2);
-
-    await this._db.run(`UPDATE "${table}" SET ${set} ${condition}`, { ...newObject, ...obj });
-  }
-
-  async push<T extends { [x: string]: unknown }>(table: string, values: T): Promise<number> {
-    const params = Object.keys(values);
-    const newObject: { [x: string]: unknown } = {};
-
-    for (const s in values) {
-      if (values[s] instanceof Date) {
-        // @ts-ignore
-        values[s] = this.convertDate(values[s] as Date);
-      }
-      newObject['$' + s] = values[s];
-    }
-
-    try {
-      return (
-        await this._db.run(
-          `INSERT INTO "${table}"(${params.join(',')}) VALUES (${Object.keys(newObject).join(
-            ',',
-          )})`,
-          newObject,
-        )
-      )['lastID'] as number;
-    } catch (e) {
-      throw new DataBaseError(e);
-    }
+    // @ts-ignore
+    this.table[name] = new Table(this._db, name);
   }
 
   async saveSession(userId: number): Promise<string> {

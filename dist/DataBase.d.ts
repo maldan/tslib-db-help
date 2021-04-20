@@ -1,31 +1,27 @@
+import { Database } from 'sqlite';
 export declare type Type_DB_Field = 'INTEGER' | 'TEXT' | 'REAL';
-export declare class DataBase {
+declare type Type_WhereOp<X> = `>= ${Extract<keyof X, string>}` | `> ${Extract<keyof X, string>}` | `<= ${Extract<keyof X, string>}` | `< ${Extract<keyof X, string>}` | `= ${Extract<keyof X, string>}`;
+declare type Type_WhereClause<X> = Partial<X> | Record<Type_WhereOp<X>, X[keyof X]>;
+export declare class Table<X> {
+    readonly db: Database;
+    readonly name: string;
+    constructor(db: Database, name: string);
+    findOne(where: Type_WhereClause<X>): Promise<X>;
+    find(where: Type_WhereClause<X>): Promise<X[]>;
+    update(data: Partial<X>, where: Type_WhereClause<X>): Promise<void>;
+    delete(where: Type_WhereClause<X>): Promise<void>;
+    push(values: Partial<X>): Promise<number>;
+}
+export declare class DataBase<X extends Record<keyof X, Table<unknown>>> {
     private _db;
     readonly path: string;
+    table: X;
     constructor(path: string);
-    init(): Promise<DataBase>;
+    init(): Promise<DataBase<X>>;
     close(): Promise<void>;
     private initSessionTable;
-    private convertKeyWithOperator;
-    private convertDate;
-    private conditionBuilder;
-    createIfNotExists(name: string, fields: {
-        [x: string]: Type_DB_Field;
-    }): Promise<void>;
-    findOne<T>(table: string, where: {
-        [x: string]: unknown;
-    }): Promise<T>;
-    find<T>(table: string, where: {
-        [x: string]: unknown;
-    }): Promise<T[]>;
-    update(table: string, data: {
-        [x: string]: unknown;
-    }, where: {
-        [x: string]: unknown;
-    }): Promise<void>;
-    push<T extends {
-        [x: string]: unknown;
-    }>(table: string, values: T): Promise<number>;
+    createIfNotExists<T extends Record<string, unknown>>(name: keyof X, fields: Record<keyof T, Type_DB_Field>): Promise<void>;
     saveSession(userId: number): Promise<string>;
     getUserByAccessToken<T>(accessToken: string): Promise<T>;
 }
+export {};

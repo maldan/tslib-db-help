@@ -31,11 +31,74 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DataBase = void 0;
+exports.DataBase = exports.Table = void 0;
 const SQL3 = __importStar(require("sqlite3"));
 const sha1_1 = __importDefault(require("sha1"));
 const sqlite_1 = require("sqlite");
 const DataBaseError_1 = require("./error/DataBaseError");
+const Util_1 = require("./Util");
+class Table {
+    constructor(db, name) {
+        this.db = db;
+        this.name = name;
+    }
+    findOne(where) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const [condition, obj] = Util_1.Util.conditionBuilder(where);
+            return (yield this.db.get(`SELECT * FROM "${this.name}" ${condition} LIMIT 1`, obj));
+        });
+    }
+    find(where) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const [condition, obj] = Util_1.Util.conditionBuilder(where);
+            const resultList = (yield this.db.all(`SELECT * FROM "${this.name}" ${condition}`, obj));
+            return resultList;
+        });
+    }
+    update(data, where) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const [condition, obj] = Util_1.Util.conditionBuilder(where);
+            let set = ``;
+            const newObject = {};
+            for (const s in data) {
+                set += s + '=$__' + s + ', ';
+                if (data[s] instanceof Date) {
+                    // @ts-ignore
+                    data[s] = Util_1.Util.convertDate(data[s]);
+                }
+                newObject['$__' + s] = data[s];
+            }
+            set = set.slice(0, -2);
+            yield this.db.run(`UPDATE "${this.name}" SET ${set} ${condition}`, Object.assign(Object.assign({}, newObject), obj));
+        });
+    }
+    delete(where) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const [condition, obj] = Util_1.Util.conditionBuilder(where);
+            yield this.db.run(`DELETE FROM "${this.name}" ${condition}`, obj);
+        });
+    }
+    push(values) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const params = Object.keys(values);
+            const newObject = {};
+            for (const s in values) {
+                if (values[s] instanceof Date) {
+                    // @ts-ignore
+                    values[s] = Util_1.Util.convertDate(values[s]);
+                }
+                newObject['$' + s] = values[s];
+            }
+            try {
+                return (yield this.db.run(`INSERT INTO "${this.name}"(${params.join(',')}) VALUES (${Object.keys(newObject).join(',')})`, newObject))['lastID'];
+            }
+            catch (e) {
+                throw new DataBaseError_1.DataBaseError(e);
+            }
+        });
+    }
+}
+exports.Table = Table;
 class DataBase {
     constructor(path) {
         this.path = path;
@@ -46,6 +109,7 @@ class DataBase {
                 filename: this.path,
                 driver: SQL3.Database,
             });
+            this.table = {};
             yield this.initSessionTable();
             return this;
         });
@@ -68,54 +132,6 @@ class DataBase {
     `);
         });
     }
-    convertKeyWithOperator(key) {
-        return key
-            .replace('< ', 'lt_')
-            .replace('> ', 'gt_')
-            .replace('<= ', 'lte_')
-            .replace('>= ', 'gte_')
-            .replace('= ', 'eq_');
-    }
-    convertDate(date) {
-        return JSON.stringify(date).replace(/"/g, '').replace('T', ' ').split('.')[0];
-    }
-    conditionBuilder(where) {
-        let condition = '';
-        const newObject = {};
-        for (const key in where) {
-            if (where[key] instanceof Date) {
-                newObject['$' + this.convertKeyWithOperator(key)] = this.convertDate(where[key]);
-            }
-            else {
-                newObject['$' + this.convertKeyWithOperator(key)] = where[key];
-            }
-        }
-        if (Array.isArray(where)) {
-        }
-        else {
-            // If has any key
-            if (Object.keys(where).length) {
-                condition = ' WHERE ';
-            }
-            // Build condition
-            for (let key in where) {
-                let op = `=`;
-                const originalKey = key;
-                if (key.split(' ').length > 1) {
-                    op = key.split(' ')[0];
-                    key = key.split(' ')[1];
-                }
-                if (where[originalKey] instanceof Date) {
-                    condition += `date(\`${key}\`) ${op} date($${this.convertKeyWithOperator(originalKey)}) AND `;
-                }
-                else {
-                    condition += `\`${key}\` ${op} $${this.convertKeyWithOperator(originalKey)} AND `;
-                }
-            }
-            condition = condition.slice(0, -4);
-        }
-        return [condition, newObject];
-    }
     createIfNotExists(name, fields) {
         return __awaiter(this, void 0, void 0, function* () {
             let out = ``;
@@ -136,54 +152,8 @@ class DataBase {
         PRIMARY KEY("id" AUTOINCREMENT)
       );
     `);
-        });
-    }
-    findOne(table, where) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const [condition, obj] = this.conditionBuilder(where);
-            return (yield this._db.get(`SELECT * FROM "${table}" ${condition} LIMIT 1`, obj));
-        });
-    }
-    find(table, where) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const [condition, obj] = this.conditionBuilder(where);
-            // console.log(condition, obj);
-            return (yield this._db.all(`SELECT * FROM "${table}" ${condition}`, obj));
-        });
-    }
-    update(table, data, where) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const [condition, obj] = this.conditionBuilder(where);
-            let set = ``;
-            const newObject = {};
-            for (const s in data) {
-                set += s + '=$__' + s + ', ';
-                if (data[s] instanceof Date) {
-                    data[s] = this.convertDate(data[s]);
-                }
-                newObject['$__' + s] = data[s];
-            }
-            set = set.slice(0, -2);
-            yield this._db.run(`UPDATE "${table}" SET ${set} ${condition}`, Object.assign(Object.assign({}, newObject), obj));
-        });
-    }
-    push(table, values) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const params = Object.keys(values);
-            const newObject = {};
-            for (const s in values) {
-                if (values[s] instanceof Date) {
-                    // @ts-ignore
-                    values[s] = this.convertDate(values[s]);
-                }
-                newObject['$' + s] = values[s];
-            }
-            try {
-                return (yield this._db.run(`INSERT INTO "${table}"(${params.join(',')}) VALUES (${Object.keys(newObject).join(',')})`, newObject))['lastID'];
-            }
-            catch (e) {
-                throw new DataBaseError_1.DataBaseError(e);
-            }
+            // @ts-ignore
+            this.table[name] = new Table(this._db, name);
         });
     }
     saveSession(userId) {

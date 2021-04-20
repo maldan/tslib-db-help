@@ -1,7 +1,11 @@
-import { DataBase } from '../src/DataBase';
+import { DataBase, Table } from '../src/DataBase';
+
+interface IBase {
+  sas: Table<{ id: number; name: string }>;
+}
 
 (async () => {
-  const db = await new DataBase('data.db').init();
+  const db = await new DataBase<IBase>('data.db').init();
 
   /*await db.push('session', {
     accessToken: 's',
@@ -25,14 +29,20 @@ import { DataBase } from '../src/DataBase';
     },
   );*/
 
+  interface ITest extends Record<string, unknown> {
+    id: number;
+    idd: number;
+  }
+
   await db.createIfNotExists('sas', {
     name: 'TEXT',
     fuck: 'INTEGER',
   });
 
-  const x = await db.push('sas', {
+  const x = await db.table.sas.push({
     name: 'GAS',
   });
-  await db.push('sas', { x: 2 });
+  await db.table.sas.push({ id: 2 });
+
   console.log(x);
 })();

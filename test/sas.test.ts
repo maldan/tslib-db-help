@@ -1,6 +1,6 @@
 import * as Chai from 'chai';
 import * as Fs from 'fs';
-import { DataBase } from '../src/DataBase';
+import { DataBase, Table } from '../src/DataBase';
 import Moment from 'moment';
 
 interface Sas extends Record<string, unknown> {
@@ -9,77 +9,67 @@ interface Sas extends Record<string, unknown> {
   date?: Date;
 }
 
-describe('Base', function () {
-  it('push', async function () {
-    const db = await new DataBase('test.db').init();
+interface IBase {
+  test: Table<Sas>;
+}
 
-    await db.createIfNotExists('test', {
+let DB: DataBase<IBase>;
+
+describe('Base', function () {
+  before(async function () {
+    DB = await new DataBase<IBase>('test.db').init();
+
+    await DB.createIfNotExists('test', {
       number: 'INTEGER',
       string: 'TEXT',
       date: 'TEXT',
     });
+  });
 
+  it('push', async function () {
     for (let i = 1; i < 4; i++) {
-      const s = await db.push<Sas>('test', {
+      const s = await DB.table.test.push({
         number: i,
       });
       Chai.assert.equal(s, i);
     }
 
-    await db.close();
-    Fs.unlinkSync('test.db');
+    await DB.table.test.delete({});
   });
 
   it('find one and all', async function () {
-    const db = await new DataBase('test.db').init();
-
-    await db.createIfNotExists('test', {
-      number: 'INTEGER',
-      string: 'TEXT',
-      date: 'TEXT',
-    });
-
     for (let i = 1; i < 4; i++) {
-      const s = await db.push<Sas>('test', {
+      const s = await DB.table.test.push({
         number: i,
       });
     }
 
-    const s = await db.findOne<Sas>('test', {
+    const s = await DB.table.test.findOne({
       number: 2,
     });
     Chai.assert.equal(s.number, 2);
 
-    const s2 = await db.find<Sas>('test', {});
+    const s2 = await DB.table.test.find({});
     Chai.assert.isArray(s2);
     Chai.assert.equal(s2.length, 3);
 
-    await db.close();
-    Fs.unlinkSync('test.db');
+    await DB.table.test.delete({});
   });
 
   it('find with op', async function () {
-    const db = await new DataBase('test.db').init();
-
-    await db.createIfNotExists('test', {
-      number: 'INTEGER',
-      string: 'TEXT',
-      date: 'TEXT',
-    });
-
     for (let i = 1; i < 4; i++) {
-      await db.push<Sas>('test', {
+      await DB.table.test.push({
         number: i,
       });
     }
 
-    const s2 = await db.find<Sas>('test', {
+    const s2 = await DB.table.test.find({
       '>= number': 1,
     });
     Chai.assert.isArray(s2);
     Chai.assert.equal(s2.length, 3);
 
-    const s3 = await db.find<Sas>('test', {
+    const s3 = await DB.table.test.find({
       '> number': 1,
       '< number': 3,
     });
@@ -87,38 +77,33 @@ describe('Base', function () {
     Chai.assert.equal(s3.length, 1);
     Chai.assert.equal(s3[0].number, 2);
 
-    await db.close();
-    Fs.unlinkSync('test.db');
+    await DB.table.test.delete({});
   });
 
   it('find with date', async function () {
-    const db = await new DataBase('test.db').init();
-
-    await db.createIfNotExists('test', {
-      number: 'INTEGER',
-      string: 'TEXT',
-      date: 'TEXT',
-    });
-
     for (let i = 1; i < 4; i++) {
-      await db.push<Sas>('test', {
+      await DB.table.test.push({
         date: Moment(new Date()).add(i, 'days').toDate(),
       });
     }
 
-    const s2 = await db.find<Sas>('test', {
+    const s2 = await DB.table.test.find({
       '>= date': Moment(new Date()).add(1, 'days').toDate(),
     });
     Chai.assert.isArray(s2);
     Chai.assert.equal(s2.length, 3);
 
-    const s3 = await db.find<Sas>('test', {
+    const s3 = await DB.table.test.find({
       '= date': Moment(new Date()).add(1, 'days').toDate(),
     });
     Chai.assert.isArray(s3);
     Chai.assert.equal(s3.length, 1);
 
-    await db.close();
+    await DB.table.test.delete({});
+  });
+
+  after(async function () {
+    await DB.close();
     Fs.unlinkSync('test.db');
   });
 });
