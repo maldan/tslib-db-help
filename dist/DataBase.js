@@ -31,93 +31,53 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DataBase = exports.Table = void 0;
+exports.DataBase = void 0;
 const SQL3 = __importStar(require("sqlite3"));
+const MySQL = __importStar(require("mysql2"));
 const sha1_1 = __importDefault(require("sha1"));
 const sqlite_1 = require("sqlite");
 const DataBaseError_1 = require("./error/DataBaseError");
-const Util_1 = require("./Util");
-class Table {
-    constructor(db, name) {
-        this.db = db;
-        this.name = name;
-    }
-    findOneOrThrowError(where) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const r = yield this.findOne(where);
-            if (!r) {
-                throw new Error(`Record not found!`);
-            }
-            return r;
-        });
-    }
-    findOne(where) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const [condition, obj] = Util_1.Util.conditionBuilder(where);
-            return ((yield this.db.get(`SELECT * FROM "${this.name}" ${condition} LIMIT 1`, obj)) || null);
-        });
-    }
-    find(where) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const [condition, obj] = Util_1.Util.conditionBuilder(where);
-            const resultList = (yield this.db.all(`SELECT * FROM "${this.name}" ${condition}`, obj));
-            return resultList;
-        });
-    }
-    update(data, where) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const [condition, obj] = Util_1.Util.conditionBuilder(where);
-            let set = ``;
-            const newObject = {};
-            for (const s in data) {
-                set += s + '=$__' + s + ', ';
-                if (data[s] instanceof Date) {
-                    // @ts-ignore
-                    data[s] = Util_1.Util.convertDate(data[s]);
-                }
-                newObject['$__' + s] = data[s];
-            }
-            set = set.slice(0, -2);
-            yield this.db.run(`UPDATE "${this.name}" SET ${set} ${condition}`, Object.assign(Object.assign({}, newObject), obj));
-        });
-    }
-    delete(where) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const [condition, obj] = Util_1.Util.conditionBuilder(where);
-            yield this.db.run(`DELETE FROM "${this.name}" ${condition}`, obj);
-        });
-    }
-    push(values) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const params = Object.keys(values);
-            const newObject = {};
-            for (const s in values) {
-                if (values[s] instanceof Date) {
-                    // @ts-ignore
-                    values[s] = Util_1.Util.convertDate(values[s]);
-                }
-                newObject['$' + s] = values[s];
-            }
-            try {
-                return (yield this.db.run(`INSERT INTO "${this.name}"(${params.join(',')}) VALUES (${Object.keys(newObject).join(',')})`, newObject))['lastID'];
-            }
-            catch (e) {
-                throw new DataBaseError_1.DataBaseError(e);
-            }
-        });
-    }
-}
-exports.Table = Table;
+const Table_1 = require("./Table");
 class DataBase {
     constructor(path) {
+        this.type = 'sqlite';
+        this.host = '';
+        this.user = '';
+        this.password = '';
+        this.db = '';
         this.path = path;
+        // Mysql db
+        if (path.match(/^mysql:\/\//)) {
+            const a = path.replace(/^mysql:\/\//, '');
+            const b = a.split('/');
+            const [user, password] = b[0].split('@')[0].split(':');
+            const host = b[0].split('@')[1];
+            const db = b[1].split('?')[0];
+            this.user = user;
+            this.password = password;
+            this.host = host;
+            this.db = db;
+            this.type = 'mysql';
+        }
     }
     init() {
         return __awaiter(this, void 0, void 0, function* () {
-            this._db = yield sqlite_1.open({
-                filename: this.path,
-                driver: SQL3.Database,
-            });
+            if (this.type === 'mysql') {
+                const pool = MySQL.createPool({
+                    connectionLimit: 10,
+                    host: this.host,
+                    user: this.user,
+                    password: this.password,
+                    database: this.db,
+                });
+                const promisePool = pool.promise();
+            }
+            else {
+                this._driver = yield sqlite_1.open({
+                    filename: this.path,
+                    driver: SQL3.Database,
+                });
+            }
             this.table = {};
             yield this.initSessionTable();
             return this;
@@ -125,12 +85,12 @@ class DataBase {
     }
     close() {
         return __awaiter(this, void 0, void 0, function* () {
-            yield this._db.close();
+            yield this._driver.close();
         });
     }
     initSessionTable() {
         return __awaiter(this, void 0, void 0, function* () {
-            yield this._db.run(`
+            yield this._driver.run(`
       CREATE TABLE IF NOT EXISTS "session" (
         "id" INTEGER,
         "accessToken" TEXT,
@@ -156,7 +116,7 @@ class DataBase {
                 }
                 out += ',\n';
             }
-            yield this._db.run(`
+            yield this._driver.run(`
       CREATE TABLE IF NOT EXISTS "${name}" (
         "id" INTEGER,
         ${out}
@@ -164,13 +124,13 @@ class DataBase {
       );
     `);
             // @ts-ignore
-            this.table[name] = new Table(this._db, name);
+            this.table[name] = new Table_1.Table(this._db, name);
         });
     }
     saveSession(userId) {
         return __awaiter(this, void 0, void 0, function* () {
             const accessToken = sha1_1.default(Math.random() + '_sasageo_' + Math.random());
-            yield this._db.run(`INSERT INTO "session"(accessToken, userId, created) VALUES ($accessToken, $userId, $created)`, {
+            yield this._driver.run(`INSERT INTO "session"(accessToken, userId, created) VALUES ($accessToken, $userId, $created)`, {
                 $accessToken: accessToken,
                 $userId: userId,
                 $created: (new Date().getTime() / 1000) | 0,
@@ -181,14 +141,14 @@ class DataBase {
     getUserByAccessToken(accessToken) {
         return __awaiter(this, void 0, void 0, function* () {
             // Session
-            const session = (yield this._db.get(`SELECT * FROM "session" WHERE accessToken=$accessToken`, {
+            const session = (yield this._driver.get(`SELECT * FROM "session" WHERE accessToken=$accessToken`, {
                 $accessToken: accessToken,
             }));
             if (!session) {
                 throw new DataBaseError_1.DataBaseError(`Session not found!`);
             }
             // User
-            const user = (yield this._db.get(`SELECT * FROM "user" WHERE id=$userId`, {
+            const user = (yield this._driver.get(`SELECT * FROM "user" WHERE id=$userId`, {
                 $userId: session.userId,
             }));
             if (!user) {

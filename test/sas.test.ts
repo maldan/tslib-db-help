@@ -1,8 +1,9 @@
 import * as Chai from 'chai';
 import * as Fs from 'fs';
-import { DataBase, Table } from '../src/DataBase';
+import { DataBase } from '../src/DataBase';
 import Moment from 'moment';
 import { Util } from '../src/Util';
+import { Table } from '../src/Table';
 
 interface Sas extends Record<string, unknown> {
   number?: number;

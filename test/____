@@ -1,7 +1,8 @@
 import * as Chai from 'chai';
 import * as Fs from 'fs';
-import { DataBase, Table } from '../src/DataBase';
+import { DataBase } from '../src/DataBase';
 import Moment from 'moment';
+import { Table } from '../src/Table';
 
 interface Sas extends Record<string, unknown> {
   number?: number;
@@ -19,7 +20,7 @@ describe('Base', function () {
   before(async function () {
     DB = await new DataBase<IBase>('test.db').init();
 
-    await DB.createIfNotExists<Sas>('test', {
+    await DB.createTableIfNotExists<Sas>('test', {
       number: 'INTEGER',
       string: 'TEXT',
       x_date: 'TEXT',
