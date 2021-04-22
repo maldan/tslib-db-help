@@ -21,7 +21,7 @@ export interface IDriver {
   find(
     table: string,
     where: Record<string, unknown>,
-    options: { orderByAsc: string[]; orderByDesc: string[]; limit: number; offset: number },
+    options?: { orderByAsc: string[]; orderByDesc: string[]; limit: number; offset: number },
   ): Promise<any>;
 
   /** Update */

@@ -16,7 +16,7 @@ export class Table<X> {
 
   async find(
     where: Type_WhereClause<X> | Type_WhereClause<X>[],
-    options: { orderByAsc: string[]; orderByDesc: string[]; limit: number; offset: number },
+    options?: { orderByAsc: string[]; orderByDesc: string[]; limit: number; offset: number },
   ): Promise<X[]> {
     return await this.driver.find(this.name, where as any, options);
   }
