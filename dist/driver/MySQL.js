@@ -38,6 +38,9 @@ class MySQL {
         this._password = password;
         this._database = database;
     }
+    count(table, where) {
+        throw new Error('Method not implemented.');
+    }
     initSessionTable() {
         throw new Error('Method not implemented.');
     }

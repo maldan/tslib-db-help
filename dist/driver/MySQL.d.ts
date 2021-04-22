@@ -11,6 +11,7 @@ export declare class MySQL implements IDriver {
         password: string;
         database: string;
     });
+    count(table: string, where: Record<string, unknown>): Promise<any>;
     initSessionTable(): Promise<void>;
     saveSession(userId: number): Promise<string>;
     getUserByAccessToken<T>(accessToken: string): Promise<T>;

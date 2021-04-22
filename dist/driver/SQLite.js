@@ -41,6 +41,12 @@ class SQLite {
     constructor(path) {
         this.path = path;
     }
+    count(table, where) {
+        throw new Error('Method not implemented.');
+    }
+    query(query) {
+        throw new Error('Method not implemented.'); //
+    }
     initSessionTable() {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.db.run(`

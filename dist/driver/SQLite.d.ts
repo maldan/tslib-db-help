@@ -4,6 +4,8 @@ export declare class SQLite implements IDriver {
     path: string;
     db: Database;
     constructor(path: string);
+    count(table: string, where: Record<string, unknown>): Promise<any>;
+    query(query: string): Promise<any>;
     initSessionTable(): Promise<void>;
     saveSession(userId: number): Promise<string>;
     getUserByAccessToken<T>(accessToken: string): Promise<T>;

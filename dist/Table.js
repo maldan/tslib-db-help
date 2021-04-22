@@ -20,9 +20,9 @@ class Table {
             return yield this.driver.findOne(this.name, where);
         });
     }
-    find(where) {
+    find(where, options) {
         return __awaiter(this, void 0, void 0, function* () {
-            return yield this.driver.find(this.name, where);
+            return yield this.driver.find(this.name, where, options);
         });
     }
     findOneOrThrowError(where) {
@@ -34,7 +34,8 @@ class Table {
             return r;
         });
     }
-    /*async findOneOrThrowError(where: Type_WhereClause<X> | Type_WhereClause<X>[]): Promise<X> {
+    /*
+    async findOneOrThrowError(where: Type_WhereClause<X> | Type_WhereClause<X>[]): Promise<X> {
       const r = await this.findOne(where);
       if (!r) {
         throw new Error(`Record not found!`);
@@ -86,7 +87,8 @@ class Table {
       const [condition, obj] = Util.conditionBuilder(where);
   
       await this.db.run(`DELETE FROM "${this.name}" ${condition}`, obj);
-    }*/
+    }
+    */
     update(data, where) {
         return __awaiter(this, void 0, void 0, function* () {
             return yield this.driver.update(this.name, data, where);
