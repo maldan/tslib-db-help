@@ -1,3 +1,10 @@
+## [2.1.0] - 2021-03-20
+
+### Added
+-    Added findOrError
+-    Fixed logical op in where
+-    Added or condition
+
 ## [2.0.0] - 2021-03-20
 
 ### Changed
