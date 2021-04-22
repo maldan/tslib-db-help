@@ -18,7 +18,7 @@ export class SQLite implements IDriver {
   }
 
   query(query: string): Promise<any> {
-    throw new Error('Method not implemented.');
+    throw new Error('Method not implemented.'); //
   }
 
   async initSessionTable(): Promise<void> {
