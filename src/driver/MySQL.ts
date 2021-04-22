@@ -1,7 +1,8 @@
 import * as MysqlDriver from 'mysql2';
-import { Driver } from '../Driver';
+import { IDriver } from './IDriver';
+import { Util } from '../Util';
 
-export class MySQL extends Driver {
+export class MySQL implements IDriver {
   private _host: string;
   private _user: string;
   private _password: string;
@@ -19,12 +20,38 @@ export class MySQL extends Driver {
     password: string;
     database: string;
   }) {
-    super();
-
     this._host = host;
     this._user = user;
     this._password = password;
     this._database = database;
+  }
+  count(table: string, where: Record<string, unknown>): Promise<any> {
+    throw new Error('Method not implemented.');
+  }
+  initSessionTable(): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
+  saveSession(userId: number): Promise<string> {
+    throw new Error('Method not implemented.');
+  }
+  getUserByAccessToken<T>(accessToken: string): Promise<T> {
+    throw new Error('Method not implemented.');
+  }
+  find(table: string, where: Record<string, unknown>): Promise<any> {
+    throw new Error('Method not implemented.');
+  }
+  update(
+    table: string,
+    data: Record<string, unknown>,
+    where: Record<string, unknown>,
+  ): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
+  delete(table: string, data: Record<string, unknown>): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
+  close(): Promise<void> {
+    throw new Error('Method not implemented.');
   }
 
   async init(): Promise<void> {
@@ -87,23 +114,32 @@ export class MySQL extends Driver {
     }
 
     const r = await this._pool?.query(
-      `INSERT INTO \`${table}\`(${params.join(',')}) VALUES (${Object.keys(newObject).join(',')})`,
+      `INSERT INTO \`${table}\`(${params.join(',')}) VALUES (${Object.keys(newObject)
+        .map((x) => `:${x}`)
+        .join(',')})`,
       newObject,
     );
 
     return r[0].insertId;
+  }
 
-    /*try {
-      return (
-        await this.db.run(
-          `INSERT INTO "${this.name}"(${params.join(',')}) VALUES (${Object.keys(newObject).join(
-            ',',
-          )})`,
-          newObject,
-        )
-      )['lastID'] as number;
-    } catch (e) {
-      throw new DataBaseError(e);
-    }*/
+  /*async findOneOrThrowError(where: Type_WhereClause<X> | Type_WhereClause<X>[]): Promise<X> {
+    const r = await this.findOne(where);
+    if (!r) {
+      throw new Error(`Record not found!`);
+    }
+    return r;
+  }*/
+
+  async findOne(
+    table: string,
+    where: Record<string, unknown> | Record<string, unknown>[],
+  ): Promise<any> {
+    const [condition, obj] = Util.conditionBuilder(where);
+    const [rows, fields] = await this._pool?.query(
+      `SELECT * FROM \`${table}\` ${condition} LIMIT 1`,
+      obj,
+    );
+    return rows;
   }
 }

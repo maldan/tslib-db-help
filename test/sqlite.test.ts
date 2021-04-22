@@ -16,7 +16,7 @@ interface IBase {
 
 let DB: DataBase<IBase>;
 
-describe('Base', function () {
+describe('Sqlite', function () {
   before(async function () {
     DB = await new DataBase<IBase>('test.db').init();
 
@@ -120,13 +120,9 @@ describe('Base', function () {
     const s3 = await DB.table.test.find({
       '== x_date': Moment(new Date()).add(1, 'days').toDate(),
     });
+
     Chai.assert.isArray(s3);
     Chai.assert.equal(s3.length, 1);
-
-    /*const s5 = await DB.table.test.findOne({
-      '= x_date': Moment(new Date()).add(2, 'days').toDate(),
-    });
-    console.log(s5);*/
 
     await DB.table.test.delete({});
   });

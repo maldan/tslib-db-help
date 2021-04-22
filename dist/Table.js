@@ -10,12 +10,20 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Table = void 0;
-const DataBaseError_1 = require("./error/DataBaseError");
-const Util_1 = require("./Util");
 class Table {
-    constructor(db, name) {
-        this.db = db;
+    constructor(driver, name) {
+        this.driver = driver;
         this.name = name;
+    }
+    findOne(where) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return yield this.driver.findOne(this.name, where);
+        });
+    }
+    find(where) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return yield this.driver.find(this.name, where);
+        });
     }
     findOneOrThrowError(where) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -26,59 +34,72 @@ class Table {
             return r;
         });
     }
-    findOne(where) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const [condition, obj] = Util_1.Util.conditionBuilder(where);
-            return ((yield this.db.get(`SELECT * FROM "${this.name}" ${condition} LIMIT 1`, obj)) || null);
-        });
+    /*async findOneOrThrowError(where: Type_WhereClause<X> | Type_WhereClause<X>[]): Promise<X> {
+      const r = await this.findOne(where);
+      if (!r) {
+        throw new Error(`Record not found!`);
+      }
+      return r;
     }
-    find(where) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const [condition, obj] = Util_1.Util.conditionBuilder(where);
-            const resultList = (yield this.db.all(`SELECT * FROM "${this.name}" ${condition}`, obj));
-            return resultList;
-        });
+  
+    async findOne(where: Type_WhereClause<X> | Type_WhereClause<X>[]): Promise<X | null> {
+      const [condition, obj] = Util.conditionBuilder(where);
+      return (
+        (((await this.db.get(
+          `SELECT * FROM "${this.name}" ${condition} LIMIT 1`,
+          obj,
+        )) as unknown) as X) || null
+      );
     }
+  
+    async find(where: Type_WhereClause<X> | Type_WhereClause<X>[]): Promise<X[]> {
+      const [condition, obj] = Util.conditionBuilder(where);
+      const resultList = ((await this.db.all(
+        `SELECT * FROM "${this.name}" ${condition}`,
+        obj,
+      )) as unknown) as X[];
+      return resultList;
+    }
+  
+    async update(
+      data: Partial<X>,
+      where: Type_WhereClause<X> | Type_WhereClause<X>[],
+    ): Promise<void> {
+      const [condition, obj] = Util.conditionBuilder(where);
+      let set = ``;
+      const newObject: { [x: string]: unknown } = {};
+  
+      for (const s in data) {
+        set += s + '=$__' + s + ', ';
+        if (data[s] instanceof Date) {
+          // @ts-ignore
+          data[s] = Util.convertDate(data[s] as Date);
+        }
+        newObject['$__' + s] = data[s];
+      }
+      set = set.slice(0, -2);
+  
+      await this.db.run(`UPDATE "${this.name}" SET ${set} ${condition}`, { ...newObject, ...obj });
+    }
+  
+    async delete(where: Type_WhereClause<X> | Type_WhereClause<X>[]): Promise<void> {
+      const [condition, obj] = Util.conditionBuilder(where);
+  
+      await this.db.run(`DELETE FROM "${this.name}" ${condition}`, obj);
+    }*/
     update(data, where) {
         return __awaiter(this, void 0, void 0, function* () {
-            const [condition, obj] = Util_1.Util.conditionBuilder(where);
-            let set = ``;
-            const newObject = {};
-            for (const s in data) {
-                set += s + '=$__' + s + ', ';
-                if (data[s] instanceof Date) {
-                    // @ts-ignore
-                    data[s] = Util_1.Util.convertDate(data[s]);
-                }
-                newObject['$__' + s] = data[s];
-            }
-            set = set.slice(0, -2);
-            yield this.db.run(`UPDATE "${this.name}" SET ${set} ${condition}`, Object.assign(Object.assign({}, newObject), obj));
-        });
-    }
-    delete(where) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const [condition, obj] = Util_1.Util.conditionBuilder(where);
-            yield this.db.run(`DELETE FROM "${this.name}" ${condition}`, obj);
+            return yield this.driver.update(this.name, data, where);
         });
     }
     push(values) {
         return __awaiter(this, void 0, void 0, function* () {
-            const params = Object.keys(values);
-            const newObject = {};
-            for (const s in values) {
-                if (values[s] instanceof Date) {
-                    // @ts-ignore
-                    values[s] = Util_1.Util.convertDate(values[s]);
-                }
-                newObject['$' + s] = values[s];
-            }
-            try {
-                return (yield this.db.run(`INSERT INTO "${this.name}"(${params.join(',')}) VALUES (${Object.keys(newObject).join(',')})`, newObject))['lastID'];
-            }
-            catch (e) {
-                throw new DataBaseError_1.DataBaseError(e);
-            }
+            return yield this.driver.push(this.name, values);
+        });
+    }
+    delete(where) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return yield this.driver.delete(this.name, where);
         });
     }
 }

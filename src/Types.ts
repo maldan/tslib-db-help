@@ -1,4 +1,4 @@
-export type Type_DB_Field = 'INTEGER' | 'TEXT' | 'REAL';
+export type Type_DB_Field = 'INTEGER' | 'TEXT' | 'REAL' | 'JSON';
 export type Type_WhereOp<X> = `${'>=' | '>' | '<=' | '<' | '==' | '!='} ${Extract<
   keyof X,
   string

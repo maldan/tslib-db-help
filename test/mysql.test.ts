@@ -18,7 +18,7 @@ interface IBase {
 let DB: DataBase<IBase>;
 
 describe('MySql Test', function () {
-  before(async function () {
+  /*before(async function () {
     DB = await new DataBase<IBase>(`mysql://root:793150@localhost/subrent`).init();
 
     await DB.createTableIfNotExists<ITest>('test', {
@@ -36,4 +36,19 @@ describe('MySql Test', function () {
       Chai.assert.equal(s, i);
     }
   });
+
+  it('find one and all', async function () {
+    for (let i = 1; i < 4; i++) {
+      const s = await DB.table.test.push({
+        number: i,
+      });
+    }
+
+    const s = await DB.table.test.findOne({
+      number: 2,
+    });
+    Chai.assert.equal(s?.number, 2);
+
+
+  });*/
 });

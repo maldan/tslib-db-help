@@ -11,9 +11,8 @@ export declare class DataBase<X extends Record<keyof X, Table<unknown>>> {
     table: X;
     constructor(path: string);
     init(): Promise<DataBase<X>>;
-    close(): Promise<void>;
-    private initSessionTable;
-    createIfNotExists<T>(name: keyof X, fields: Record<keyof T, Type_DB_Field>): Promise<void>;
+    createTableIfNotExists<T>(name: keyof X, fields: Record<keyof T, Type_DB_Field>): Promise<void>;
     saveSession(userId: number): Promise<string>;
     getUserByAccessToken<T>(accessToken: string): Promise<T>;
+    close(): Promise<void>;
 }

@@ -1,11 +1,11 @@
 import { Table } from './Table';
-import { Driver } from './Driver';
+import { IDriver } from './driver/IDriver';
 import { SQLite } from './driver/SQLite';
 import { MySQL } from './driver/MySQL';
 import { Type_DB_Field } from './Types';
 
 export class DataBase<X extends Record<keyof X, Table<unknown>>> {
-  private _driver!: Driver;
+  private _driver!: IDriver;
 
   readonly path: string;
   readonly type: 'sqlite' | 'mysql' = 'sqlite';
@@ -56,13 +56,14 @@ export class DataBase<X extends Record<keyof X, Table<unknown>>> {
         filename: this.path,
         driver: SQL3.Database,
       });*/
-      this._driver = new SQLite();
+      this._driver = new SQLite(this.path);
     }
 
     await this._driver.init();
+    await this._driver.initSessionTable();
 
     this.table = {} as X;
-    // await this.initSessionTable();
+
     return this;
   }
 
@@ -74,6 +75,14 @@ export class DataBase<X extends Record<keyof X, Table<unknown>>> {
 
     // @ts-ignore
     this.table[name] = new Table(this._driver, name);
+  }
+
+  async saveSession(userId: number): Promise<string> {
+    return await this._driver.saveSession(userId);
+  }
+
+  async getUserByAccessToken<T>(accessToken: string): Promise<T> {
+    return await this._driver.getUserByAccessToken(accessToken);
   }
 
   async close(): Promise<void> {
